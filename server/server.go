@@ -425,7 +425,7 @@ func (s *Server) appendTaskStoreService() {
 
 func (s *Server) appendSessionService() {
 	// TODO: add diagnostic
-	srv := diagnostic.NewSessionService()
+	srv := s.DiagService.SessionService
 	srv.HTTPDService = s.HTTPDService
 
 	s.AppendService("session", srv)

@@ -51,7 +51,8 @@ func (l *ServerLogger) With(ctx ...Field) Logger {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return &ServerLogger{
-		mu:      l.mu,
+		mu: l.mu,
+		// TODO: actually copy values not just append to previous context
 		context: append(l.context, ctx...),
 		w:       l.w,
 		levelF:  l.levelF,

@@ -23,7 +23,7 @@ type SessionService struct {
 	//diag   Diagnostic
 	routes []httpd.Route
 
-	sessions     SessionsLogger
+	sessions     SessionsStore
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 	}
@@ -34,7 +34,7 @@ type SessionService struct {
 
 func NewSessionService() *SessionService {
 	return &SessionService{
-		sessions: &sessionsLogger{
+		sessions: &sessionsStore{
 			sessions: make(map[uuid.UUID]*Session),
 		},
 	}
@@ -89,6 +89,12 @@ func (s *SessionService) Open() error {
 	return nil
 }
 
+func (s *SessionService) NewLogger() *sessionsLogger {
+	return &sessionsLogger{
+		store: s.sessions,
+	}
+}
+
 func (s *SessionService) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	tags := []StringField{}
@@ -99,7 +105,7 @@ func (s *SessionService) handleCreateSession(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		tags = append(tags, *String(k, v[0]).(*StringField))
+		tags = append(tags, String(k, v[0]).(StringField))
 	}
 
 	session := s.sessions.Create(tags)

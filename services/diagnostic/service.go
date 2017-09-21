@@ -26,6 +26,8 @@ type Service struct {
 	stdout io.Writer
 	stderr io.Writer
 
+	SessionService *SessionService
+
 	levelMu sync.RWMutex
 	level   string
 }
@@ -110,8 +112,12 @@ func (s *Service) Open() error {
 
 	l := NewServerLogger(s.f)
 	l.SetLevelF(levelF)
+
+	s.SessionService = NewSessionService()
+
 	s.logger = NewMultiLogger(
 		l,
+		s.SessionService.NewLogger(),
 	)
 
 	return nil
