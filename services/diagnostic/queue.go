@@ -1,18 +1,16 @@
-package session
+package diagnostic
 
 import (
 	"bytes"
 	"sync"
 	"time"
-
-	"github.com/influxdata/kapacitor/services/diagnostic/internal/log"
 )
 
 type Data struct {
 	Time    time.Time
 	Message string
 	Level   string
-	Fields  []log.Field
+	Fields  []Field
 }
 
 func (d Data) WriteTo(buf *bytes.Buffer) (int, error) {

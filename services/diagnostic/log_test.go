@@ -1,4 +1,4 @@
-package log_test
+package diagnostic
 
 import (
 	"bytes"
@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/influxdata/kapacitor/services/diagnostic/internal/log"
 )
 
 var defaultTime = time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)

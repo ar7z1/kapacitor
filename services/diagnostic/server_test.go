@@ -1,4 +1,4 @@
-package session_test
+package diagnostic_test
 
 import "testing"
 

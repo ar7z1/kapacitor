@@ -1,11 +1,10 @@
-package session
+package diagnostic
 
 import (
 	"errors"
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/diagnostic/internal/log"
 	"github.com/influxdata/kapacitor/uuid"
 )
 
@@ -15,19 +14,19 @@ const (
 	sessionExipryDuration = 20 * time.Second
 )
 
-type SessionsDAO interface {
-	Create(tags []log.StringField) *Session
+type SessionsLogger interface {
+	Create(tags []StringField) *Session
 	Get(id string) (*Session, error)
 	Delete(id string) error
 	Prune() error
 }
 
-type sessionKV struct {
+type sessionsLogger struct {
 	mu       sync.RWMutex
 	sessions map[uuid.UUID]*Session
 }
 
-func (kv *sessionKV) Create(tags []log.StringField) *Session {
+func (kv *sessionsLogger) Create(tags []StringField) *Session {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	s := &Session{
@@ -43,7 +42,7 @@ func (kv *sessionKV) Create(tags []log.StringField) *Session {
 	return s
 }
 
-func (kv *sessionKV) Delete(id string) error {
+func (kv *sessionsLogger) Delete(id string) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	s, err := kv.get(id)
@@ -60,7 +59,7 @@ func (kv *sessionKV) Delete(id string) error {
 	return nil
 }
 
-func (kv *sessionKV) Prune() error {
+func (kv *sessionsLogger) Prune() error {
 	ids := []uuid.UUID{}
 	kv.mu.RLock()
 	now := time.Now()
@@ -83,13 +82,13 @@ func (kv *sessionKV) Prune() error {
 	return nil
 }
 
-func (kv *sessionKV) Get(id string) (*Session, error) {
+func (kv *sessionsLogger) Get(id string) (*Session, error) {
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 	return kv.get(id)
 }
 
-func (kv *sessionKV) get(id string) (*Session, error) {
+func (kv *sessionsLogger) get(id string) (*Session, error) {
 	sid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -113,7 +112,7 @@ type Session struct {
 	page     int
 	deadline time.Time
 
-	tags []log.StringField
+	tags []StringField
 
 	queue *Queue
 }

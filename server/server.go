@@ -28,7 +28,6 @@ import (
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/services/diagnostic/session"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -111,7 +110,7 @@ type Server struct {
 	AlertService          *alert.Service
 	TaskStore             *task_store.Service
 	ReplayService         *replay.Service
-	SessionService        *session.Service
+	SessionService        *diagnostic.SessionService
 	InfluxDBService       *influxdb.Service
 	ConfigOverrideService *config.Service
 	TesterService         *servicetest.Service
@@ -426,7 +425,7 @@ func (s *Server) appendTaskStoreService() {
 
 func (s *Server) appendSessionService() {
 	// TODO: add diagnostic
-	srv := session.NewService()
+	srv := diagnostic.NewSessionService()
 	srv.HTTPDService = s.HTTPDService
 
 	s.AppendService("session", srv)

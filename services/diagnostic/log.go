@@ -1,4 +1,4 @@
-package log
+package diagnostic
 
 import (
 	"bufio"
@@ -22,7 +22,7 @@ func defaultLevelF(lvl Level) bool {
 	return true
 }
 
-type Logger struct {
+type ServerLogger struct {
 	mu      *sync.Mutex
 	context []Field
 	w       *bufio.Writer
@@ -31,9 +31,9 @@ type Logger struct {
 	levelF  func(lvl Level) bool
 }
 
-func NewLogger(w io.Writer) *Logger {
+func NewServerLogger(w io.Writer) *ServerLogger {
 	var mu sync.Mutex
-	return &Logger{
+	return &ServerLogger{
 		mu:     &mu,
 		w:      bufio.NewWriter(w),
 		levelF: defaultLevelF,
@@ -41,16 +41,16 @@ func NewLogger(w io.Writer) *Logger {
 }
 
 // LevelF set on parent applies to self and any future children
-func (l *Logger) SetLevelF(f func(Level) bool) {
+func (l *ServerLogger) SetLevelF(f func(Level) bool) {
 	l.levelMu.Lock()
 	defer l.levelMu.Unlock()
 	l.levelF = f
 }
 
-func (l *Logger) With(ctx ...Field) *Logger {
+func (l *ServerLogger) With(ctx ...Field) Logger {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return &Logger{
+	return &ServerLogger{
 		mu:      l.mu,
 		context: append(l.context, ctx...),
 		w:       l.w,
@@ -58,7 +58,7 @@ func (l *Logger) With(ctx ...Field) *Logger {
 	}
 }
 
-func (l *Logger) Error(msg string, ctx ...Field) {
+func (l *ServerLogger) Error(msg string, ctx ...Field) {
 	l.levelMu.RLock()
 	logLine := l.levelF(ErrorLevel)
 	l.levelMu.RUnlock()
@@ -67,7 +67,7 @@ func (l *Logger) Error(msg string, ctx ...Field) {
 	}
 }
 
-func (l *Logger) Debug(msg string, ctx ...Field) {
+func (l *ServerLogger) Debug(msg string, ctx ...Field) {
 	l.levelMu.RLock()
 	logLine := l.levelF(DebugLevel)
 	l.levelMu.RUnlock()
@@ -76,7 +76,7 @@ func (l *Logger) Debug(msg string, ctx ...Field) {
 	}
 }
 
-func (l *Logger) Warn(msg string, ctx ...Field) {
+func (l *ServerLogger) Warn(msg string, ctx ...Field) {
 	l.levelMu.RLock()
 	logLine := l.levelF(WarnLevel)
 	l.levelMu.RUnlock()
@@ -85,7 +85,7 @@ func (l *Logger) Warn(msg string, ctx ...Field) {
 	}
 }
 
-func (l *Logger) Info(msg string, ctx ...Field) {
+func (l *ServerLogger) Info(msg string, ctx ...Field) {
 	l.levelMu.RLock()
 	logLine := l.levelF(InfoLevel)
 	l.levelMu.RUnlock()
@@ -95,7 +95,7 @@ func (l *Logger) Info(msg string, ctx ...Field) {
 }
 
 // TODO: actually care about errors?
-func (l *Logger) Log(now time.Time, level string, msg string, ctx []Field) {
+func (l *ServerLogger) Log(now time.Time, level string, msg string, ctx []Field) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

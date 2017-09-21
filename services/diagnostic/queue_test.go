@@ -1,17 +1,14 @@
-package session_test
+package diagnostic_test
 
 import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/influxdata/kapacitor/services/diagnostic/internal/log"
-	"github.com/influxdata/kapacitor/services/diagnostic/session"
 )
 
 func TestQueue(t *testing.T) {
 	now := time.Now()
-	data := []*session.Data{
+	data := []*diagnostic.Data{
 		{
 			Time:    now,
 			Message: "0",
@@ -38,7 +35,7 @@ func TestQueue(t *testing.T) {
 		},
 	}
 
-	q := &session.Queue{}
+	q := &diagnostic.Queue{}
 	// Verify null state
 	if exp, got := 0, q.Len(); exp != got {
 		t.Fatalf("expected length of queue to be %v, got %v", exp, got)
@@ -67,14 +64,14 @@ func TestQueue(t *testing.T) {
 
 func TestEnqueDequeueDequeue(t *testing.T) {
 	now := time.Now()
-	data := &session.Data{
+	data := &diagnostic.Data{
 		Time:    now,
 		Message: "0",
 		Level:   "info",
 		Fields:  []log.Field{log.String("test", "0")},
 	}
 
-	q := &session.Queue{}
+	q := &diagnostic.Queue{}
 
 	q.Enqueue(data)
 	// Verify length of queue
@@ -91,7 +88,7 @@ func TestEnqueDequeueDequeue(t *testing.T) {
 		t.Fatalf("expected length of queue to be %v, got %v", exp, got)
 	}
 
-	var nilData *session.Data
+	var nilData *diagnostic.Data
 	if exp, got := nilData, q.Dequeue(); !reflect.DeepEqual(nilData, got) {
 		t.Fatalf("expected %v\ngot: %v", exp, got)
 	}

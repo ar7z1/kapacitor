@@ -1,4 +1,4 @@
-package session
+package diagnostic
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/diagnostic/internal/log"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/uuid"
 )
@@ -20,11 +19,11 @@ const (
 //type Diagnostic interface {
 //}
 
-type Service struct {
+type SessionService struct {
 	//diag   Diagnostic
 	routes []httpd.Route
 
-	sessions     SessionsDAO
+	sessions     SessionsLogger
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 	}
@@ -33,23 +32,23 @@ type Service struct {
 	closing chan struct{}
 }
 
-func NewService() *Service {
-	return &Service{
-		sessions: &sessionKV{
+func NewSessionService() *SessionService {
+	return &SessionService{
+		sessions: &sessionsLogger{
 			sessions: make(map[uuid.UUID]*Session),
 		},
 	}
 }
 
 // TODO: implement
-func (s *Service) Close() error {
+func (s *SessionService) Close() error {
 	s.closing <- struct{}{}
 	s.ticker.Stop()
 	close(s.closing)
 	return nil
 }
 
-func (s *Service) Open() error {
+func (s *SessionService) Open() error {
 	ch := make(chan struct{}, 0)
 	s.ticker = time.NewTicker(time.Second)
 
@@ -90,9 +89,9 @@ func (s *Service) Open() error {
 	return nil
 }
 
-func (s *Service) handleCreateSession(w http.ResponseWriter, r *http.Request) {
+func (s *SessionService) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	tags := []log.StringField{}
+	tags := []StringField{}
 
 	for k, v := range params {
 		if len(v) != 1 {
@@ -100,7 +99,7 @@ func (s *Service) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		tags = append(tags, *log.String(k, v[0]).(*log.StringField))
+		tags = append(tags, *String(k, v[0]).(*StringField))
 	}
 
 	session := s.sessions.Create(tags)
@@ -111,7 +110,7 @@ func (s *Service) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	header.Add("Deadline", session.Deadline().UTC().String())
 }
 
-func (s *Service) handleSession(w http.ResponseWriter, r *http.Request) {
+func (s *SessionService) handleSession(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 
 	id := params.Get("id")
