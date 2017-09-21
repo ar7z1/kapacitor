@@ -16,6 +16,7 @@
 - [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
 - [#1569](https://github.com/influxdata/kapacitor/issues/1569): Add support for add the HTTP status code as a field when using httpPost
 - [#1535](https://github.com/influxdata/kapacitor/pull/1535): Add logfmt support and refactor logging.
+- [#1578](https://github.com/influxdata/kapacitor/pull/1578): Add support for exposing logs via the API.
 
 ### Bugfixes
 
