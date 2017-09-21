@@ -1,4 +1,4 @@
-package diagnostic
+package diagnostic_test
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 var defaultTime = time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
@@ -19,16 +21,16 @@ func (t testStringer) String() string {
 
 func TestLoggerWithoutContext(t *testing.T) {
 	now := time.Now()
-	nowStr := now.Format(log.RFC3339Milli)
+	nowStr := now.Format(diagnostic.RFC3339Milli)
 	buf := bytes.NewBuffer(nil)
-	l := log.NewLogger(buf)
+	l := diagnostic.NewServerLogger(buf)
 
 	tests := []struct {
 		name   string
 		exp    string
 		lvl    string
 		msg    string
-		fields []log.Field
+		fields []diagnostic.Field
 	}{
 		{
 			name: "no fields simple message",
@@ -53,8 +55,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=this\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.String("test", "this"),
+			fields: []diagnostic.Field{
+				diagnostic.String("test", "this"),
 			},
 		},
 		{
@@ -62,8 +64,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=\"this is \\\" a test/yeah\"\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.String("test", "this is \" a test/yeah"),
+			fields: []diagnostic.Field{
+				diagnostic.String("test", "this is \" a test/yeah"),
 			},
 		},
 		{
@@ -71,8 +73,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=this\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Stringer("test", testStringer("this")),
+			fields: []diagnostic.Field{
+				diagnostic.Stringer("test", testStringer("this")),
 			},
 		},
 		{
@@ -80,9 +82,9 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test_a=this\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.GroupedFields("test", []log.Field{
-					log.String("a", "this"),
+			fields: []diagnostic.Field{
+				diagnostic.GroupedFields("test", []diagnostic.Field{
+					diagnostic.String("a", "this"),
 				}),
 			},
 		},
@@ -91,10 +93,10 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test_a=this test_b=other\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.GroupedFields("test", []log.Field{
-					log.String("a", "this"),
-					log.String("b", "other"),
+			fields: []diagnostic.Field{
+				diagnostic.GroupedFields("test", []diagnostic.Field{
+					diagnostic.String("a", "this"),
+					diagnostic.String("b", "other"),
 				}),
 			},
 		},
@@ -103,8 +105,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test_0=this\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Strings("test", []string{"this"}),
+			fields: []diagnostic.Field{
+				diagnostic.Strings("test", []string{"this"}),
 			},
 		},
 		{
@@ -112,8 +114,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test_0=this test_1=other\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Strings("test", []string{"this", "other"}),
+			fields: []diagnostic.Field{
+				diagnostic.Strings("test", []string{"this", "other"}),
 			},
 		},
 		{
@@ -121,8 +123,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=10\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Int("test", 10),
+			fields: []diagnostic.Field{
+				diagnostic.Int("test", 10),
 			},
 		},
 		{
@@ -130,8 +132,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=10\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Int64("test", 10),
+			fields: []diagnostic.Field{
+				diagnostic.Int64("test", 10),
 			},
 		},
 		{
@@ -139,8 +141,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=3.1415926535\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Float64("test", 3.1415926535),
+			fields: []diagnostic.Field{
+				diagnostic.Float64("test", 3.1415926535),
 			},
 		},
 		{
@@ -148,8 +150,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=true\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Bool("test", true),
+			fields: []diagnostic.Field{
+				diagnostic.Bool("test", true),
 			},
 		},
 		{
@@ -157,8 +159,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=false\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Bool("test", false),
+			fields: []diagnostic.Field{
+				diagnostic.Bool("test", false),
 			},
 		},
 		{
@@ -166,8 +168,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test err=this\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Error(errors.New("this")),
+			fields: []diagnostic.Field{
+				diagnostic.Error(errors.New("this")),
 			},
 		},
 		{
@@ -175,8 +177,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test err=nil\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Error(nil),
+			fields: []diagnostic.Field{
+				diagnostic.Error(nil),
 			},
 		},
 		{
@@ -184,8 +186,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test err=\"this is \\\" a test/yeah\"\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Error(errors.New("this is \" a test/yeah")),
+			fields: []diagnostic.Field{
+				diagnostic.Error(errors.New("this is \" a test/yeah")),
 			},
 		},
 		{
@@ -193,8 +195,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test time=%s\n", nowStr, defaultTime.Format(time.RFC3339Nano)),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Time("time", defaultTime),
+			fields: []diagnostic.Field{
+				diagnostic.Time("time", defaultTime),
 			},
 		},
 		{
@@ -202,8 +204,8 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test test=1s\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Duration("test", time.Second),
+			fields: []diagnostic.Field{
+				diagnostic.Duration("test", time.Second),
 			},
 		},
 		{
@@ -211,9 +213,9 @@ func TestLoggerWithoutContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test testing=\"that this\" works=1s\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.String("testing", "that this"),
-				log.Duration("works", time.Second),
+			fields: []diagnostic.Field{
+				diagnostic.String("testing", "that this"),
+				diagnostic.Duration("works", time.Second),
 			},
 		},
 	}
@@ -231,16 +233,16 @@ func TestLoggerWithoutContext(t *testing.T) {
 
 func TestLoggerWithContext(t *testing.T) {
 	now := time.Now()
-	nowStr := now.Format(log.RFC3339Milli)
+	nowStr := now.Format(diagnostic.RFC3339Milli)
 	buf := bytes.NewBuffer(nil)
-	l := log.NewLogger(buf).With(log.String("a", "tag"), log.Int("id", 10))
+	l := diagnostic.NewServerLogger(buf).With(diagnostic.String("a", "tag"), diagnostic.Int("id", 10)).(*diagnostic.ServerLogger)
 
 	tests := []struct {
 		name   string
 		exp    string
 		lvl    string
 		msg    string
-		fields []log.Field
+		fields []diagnostic.Field
 	}{
 		{
 			name: "no fields simple message",
@@ -253,10 +255,10 @@ func TestLoggerWithContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test a=tag id=10 test_a=this test_b=other\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.GroupedFields("test", []log.Field{
-					log.String("a", "this"),
-					log.String("b", "other"),
+			fields: []diagnostic.Field{
+				diagnostic.GroupedFields("test", []diagnostic.Field{
+					diagnostic.String("a", "this"),
+					diagnostic.String("b", "other"),
 				}),
 			},
 		},
@@ -265,8 +267,8 @@ func TestLoggerWithContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test a=tag id=10 test_0=this test_1=other\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.Strings("test", []string{"this", "other"}),
+			fields: []diagnostic.Field{
+				diagnostic.Strings("test", []string{"this", "other"}),
 			},
 		},
 		{
@@ -274,9 +276,9 @@ func TestLoggerWithContext(t *testing.T) {
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test a=tag id=10 testing=\"that this\" works=1s\n", nowStr),
 			lvl:  "error",
 			msg:  "test",
-			fields: []log.Field{
-				log.String("testing", "that this"),
-				log.Duration("works", time.Second),
+			fields: []diagnostic.Field{
+				diagnostic.String("testing", "that this"),
+				diagnostic.Duration("works", time.Second),
 			},
 		},
 	}
@@ -296,11 +298,11 @@ func TestLoggerWithContext(t *testing.T) {
 func TestLogger_SetLeveF(t *testing.T) {
 	var logLine string
 	buf := bytes.NewBuffer(nil)
-	l := log.NewLogger(buf)
+	l := diagnostic.NewServerLogger(buf)
 	msg := "the message"
 
-	l.SetLevelF(func(lvl log.Level) bool {
-		return lvl >= log.DebugLevel
+	l.SetLevelF(func(lvl diagnostic.Level) bool {
+		return lvl >= diagnostic.DebugLevel
 	})
 	l.Debug(msg)
 	logLine = buf.String()
@@ -331,8 +333,8 @@ func TestLogger_SetLeveF(t *testing.T) {
 		return
 	}
 
-	l.SetLevelF(func(lvl log.Level) bool {
-		return lvl >= log.InfoLevel
+	l.SetLevelF(func(lvl diagnostic.Level) bool {
+		return lvl >= diagnostic.InfoLevel
 	})
 	l.Debug(msg)
 	logLine = buf.String()
@@ -363,8 +365,8 @@ func TestLogger_SetLeveF(t *testing.T) {
 		return
 	}
 
-	l.SetLevelF(func(lvl log.Level) bool {
-		return lvl >= log.WarnLevel
+	l.SetLevelF(func(lvl diagnostic.Level) bool {
+		return lvl >= diagnostic.WarnLevel
 	})
 	l.Debug(msg)
 	logLine = buf.String()
@@ -395,8 +397,8 @@ func TestLogger_SetLeveF(t *testing.T) {
 		return
 	}
 
-	l.SetLevelF(func(lvl log.Level) bool {
-		return lvl >= log.ErrorLevel
+	l.SetLevelF(func(lvl diagnostic.Level) bool {
+		return lvl >= diagnostic.ErrorLevel
 	})
 	l.Debug(msg)
 	logLine = buf.String()

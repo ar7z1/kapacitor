@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 func TestQueue(t *testing.T) {
@@ -13,25 +15,25 @@ func TestQueue(t *testing.T) {
 			Time:    now,
 			Message: "0",
 			Level:   "info",
-			Fields:  []log.Field{log.String("test", "0")},
+			Fields:  []diagnostic.Field{diagnostic.String("test", "0")},
 		},
 		{
 			Time:    now,
 			Message: "1",
 			Level:   "debug",
-			Fields:  []log.Field{log.String("test", "1")},
+			Fields:  []diagnostic.Field{diagnostic.String("test", "1")},
 		},
 		{
 			Time:    now,
 			Message: "2",
 			Level:   "warn",
-			Fields:  []log.Field{log.String("test", "2")},
+			Fields:  []diagnostic.Field{diagnostic.String("test", "2")},
 		},
 		{
 			Time:    now,
 			Message: "3",
 			Level:   "warn",
-			Fields:  []log.Field{log.String("test", "3"), log.Int("number", 3)},
+			Fields:  []diagnostic.Field{diagnostic.String("test", "3"), diagnostic.Int("number", 3)},
 		},
 	}
 
@@ -68,7 +70,7 @@ func TestEnqueDequeueDequeue(t *testing.T) {
 		Time:    now,
 		Message: "0",
 		Level:   "info",
-		Fields:  []log.Field{log.String("test", "0")},
+		Fields:  []diagnostic.Field{diagnostic.String("test", "0")},
 	}
 
 	q := &diagnostic.Queue{}
