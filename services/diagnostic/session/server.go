@@ -45,6 +45,7 @@ func NewService() *Service {
 func (s *Service) Close() error {
 	s.closing <- struct{}{}
 	s.ticker.Stop()
+	close(s.closing)
 	return nil
 }
 
