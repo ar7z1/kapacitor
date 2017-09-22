@@ -97,7 +97,7 @@ func (s *SessionService) NewLogger() *sessionsLogger {
 
 func (s *SessionService) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	tags := []StringField{}
+	tags := []tag{}
 
 	for k, v := range params {
 		if len(v) != 1 {
@@ -105,11 +105,11 @@ func (s *SessionService) handleCreateSession(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		tags = append(tags, String(k, v[0]).(StringField))
+		tags = append(tags, tag{key: k, value: v[0]})
 	}
 
 	session := s.sessions.Create(tags)
-	u := fmt.Sprintf("%s,%s?id=%s&page=%v", httpd.BasePath, sessionsPath, session.ID(), session.Page())
+	u := fmt.Sprintf("%s%s?id=%s&page=%v", httpd.BasePath, sessionsPath, session.ID(), session.Page())
 
 	header := w.Header()
 	header.Add("Link", fmt.Sprintf("<%s>; rel=\"next\";", u))
@@ -153,20 +153,20 @@ func (s *SessionService) handleSession(w http.ResponseWriter, r *http.Request) {
 	// TODO: add byte buffer pool here
 	buf := bytes.NewBuffer(nil)
 	// TODO: add support for JSON and logfmt encoding
-	for _, line := range p {
-		line.WriteTo(buf)
+	for _, l := range p {
+		writeLogfmt(buf, l.Time, l.Level, l.Message, l.Context, l.Fields)
+		//line.WriteTo(buf)
 	}
 
-	u := fmt.Sprintf("%s,%s?id=%s&page=%v", httpd.BasePath, sessionsPath, session.ID(), session.Page())
+	u := fmt.Sprintf("%s%s?id=%s&page=%v", httpd.BasePath, sessionsPath, session.ID(), session.Page())
 
 	header := w.Header()
 	header.Add("Link", fmt.Sprintf("<%s>; rel=\"next\";", u))
 	header.Add("Deadline", session.Deadline().UTC().String())
-	fmt.Println(header)
 
 	w.WriteHeader(http.StatusOK)
-	//w.Write(buf.Bytes())
-	w.Write([]byte("yah"))
+	w.Write(buf.Bytes())
+	//w.Write([]byte("yah"))
 
 	return
 }

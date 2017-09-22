@@ -99,40 +99,44 @@ func (l *ServerLogger) Info(msg string, ctx ...Field) {
 func (l *ServerLogger) Log(now time.Time, level string, msg string, ctx []Field) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	writeTimestamp(l.w, now)
-	l.w.WriteByte(' ')
-	writeLevel(l.w, level)
-	l.w.WriteByte(' ')
-	writeMessage(l.w, msg)
-
-	for _, f := range l.context {
-		l.w.WriteByte(' ')
-		f.WriteTo(l.w)
-	}
-
-	for _, f := range ctx {
-		l.w.WriteByte(' ')
-		f.WriteTo(l.w)
-	}
-
-	l.w.WriteByte('\n')
-
+	writeLogfmt(l.w, now, level, msg, l.context, ctx)
 	l.w.Flush()
 }
 
-func writeTimestamp(w *bufio.Writer, now time.Time) {
+// TODO: actually care about errors?
+func writeLogfmt(w Writer, now time.Time, level string, msg string, context, fields []Field) {
+
+	writeTimestamp(w, now)
+	w.WriteByte(' ')
+	writeLevel(w, level)
+	w.WriteByte(' ')
+	writeMessage(w, msg)
+
+	for _, f := range context {
+		w.WriteByte(' ')
+		f.WriteLogfmtTo(w)
+	}
+
+	for _, f := range fields {
+		w.WriteByte(' ')
+		f.WriteLogfmtTo(w)
+	}
+
+	w.WriteByte('\n')
+}
+
+func writeTimestamp(w Writer, now time.Time) {
 	w.Write([]byte("ts="))
 	// TODO: UTC?
 	w.WriteString(now.Format(RFC3339Milli))
 }
 
-func writeLevel(w *bufio.Writer, lvl string) {
+func writeLevel(w Writer, lvl string) {
 	w.Write([]byte("lvl="))
 	w.WriteString(lvl)
 }
 
-func writeMessage(w *bufio.Writer, msg string) {
+func writeMessage(w Writer, msg string) {
 	w.Write([]byte("msg="))
 	writeString(w, msg)
 }

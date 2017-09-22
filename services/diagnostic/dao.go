@@ -2,7 +2,6 @@ package diagnostic
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -12,11 +11,11 @@ import (
 const (
 	pageSize = 10
 	// TODO: what to make this value
-	sessionExipryDuration = 20 * time.Second
+	sessionExipryDuration = 10 * time.Second
 )
 
 type SessionsStore interface {
-	Create(tags []StringField) *Session
+	Create(tags []tag) *Session
 	Get(id string) (*Session, error)
 	Delete(id string) error
 	Prune() error
@@ -28,7 +27,7 @@ type sessionsStore struct {
 	sessions map[uuid.UUID]*Session
 }
 
-func (kv *sessionsStore) Create(tags []StringField) *Session {
+func (kv *sessionsStore) Create(tags []tag) *Session {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	s := &Session{
@@ -158,13 +157,18 @@ func (s *sessionsLogger) With(ctx ...Field) Logger {
 	}
 }
 
+type tag struct {
+	key   string
+	value string
+}
+
 type Session struct {
 	mu       sync.RWMutex
 	id       uuid.UUID
 	page     int
 	deadline time.Time
 
-	tags []StringField
+	tags []tag
 
 	queue *Queue
 }
@@ -194,12 +198,15 @@ func (s *Session) GetPage(page int) ([]*Data, error) {
 	s.page++
 	s.deadline = s.deadline.Add(sessionExipryDuration)
 
-	l := make([]*Data, pageSize)
+	//l := make([]*Data, 0, pageSize)
+	l := []*Data{}
 	for i := 0; i < pageSize; i++ {
 		if s.queue.Len() == 0 {
 			break
 		}
-		l = append(l, s.queue.Dequeue())
+		if d := s.queue.Dequeue(); d != nil {
+			l = append(l, d)
+		}
 	}
 
 	return l, nil
@@ -211,18 +218,79 @@ func (s *Session) Close() error {
 }
 
 func (s *Session) Error(msg string, context, fields []Field) {
-	/// TODO: check for match
+	if match(s.tags, msg, "error", context, fields) {
+		s.queue.Enqueue(&Data{
+			Time:    time.Now(),
+			Message: msg,
+			Level:   "info",
+			Context: context,
+			Fields:  fields,
+		})
+	}
 }
 
 func (s *Session) Warn(msg string, context, fields []Field) {
-	/// TODO: check for match
+	if match(s.tags, msg, "warn", context, fields) {
+		s.queue.Enqueue(&Data{
+			Time:    time.Now(),
+			Message: msg,
+			Level:   "info",
+			Context: context,
+			Fields:  fields,
+		})
+	}
 }
 
 func (s *Session) Debug(msg string, context, fields []Field) {
-	/// TODO: check for match
+	if match(s.tags, msg, "debug", context, fields) {
+		s.queue.Enqueue(&Data{
+			Time:    time.Now(),
+			Message: msg,
+			Level:   "info",
+			Context: context,
+			Fields:  fields,
+		})
+	}
 }
 
 func (s *Session) Info(msg string, context, fields []Field) {
-	/// TODO: check for match
-	fmt.Println(s.tags)
+	if match(s.tags, msg, "info", context, fields) {
+		s.queue.Enqueue(&Data{
+			Time:    time.Now(),
+			Message: msg,
+			Level:   "info",
+			Context: context,
+			Fields:  fields,
+		})
+	}
+}
+
+// TODO: check level and msg
+func match(tags []tag, msg, level string, context, fields []Field) bool {
+	ctr := 0
+Loop:
+	for _, t := range tags {
+		if t.key == "msg" && t.value == msg {
+			ctr++
+			continue Loop
+		}
+		if t.key == "lvl" && t.value == level {
+			ctr++
+			continue Loop
+		}
+		for _, c := range context {
+			if c.Match(t.key, t.value) {
+				ctr++
+				continue Loop
+			}
+		}
+		for _, f := range fields {
+			if f.Match(t.key, t.value) {
+				ctr++
+				continue Loop
+			}
+		}
+	}
+
+	return len(tags) == ctr
 }

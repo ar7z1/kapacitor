@@ -10,6 +10,7 @@ type Data struct {
 	Time    time.Time
 	Message string
 	Level   string
+	Context []Field
 	Fields  []Field
 }
 
@@ -72,7 +73,13 @@ func (q *Queue) Dequeue() *Data {
 	q.length--
 
 	d := q.head.data
-	q.head = q.head.next
+	// TODO: is this right??
+	if q.length == 0 {
+		q.head = nil
+		q.tail = nil
+	} else {
+		q.head = q.head.next
+	}
 
 	return d
 }

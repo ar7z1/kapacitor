@@ -1,14 +1,20 @@
 package diagnostic
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func writeString(w *bufio.Writer, s string) (n int, err error) {
+type Writer interface {
+	Write([]byte) (int, error)
+	WriteByte(byte) error
+	WriteString(string) (int, error)
+}
+
+func writeString(w Writer, s string) (n int, err error) {
 	var m int
 	// TODO: revisit
 	if strings.ContainsAny(s, " \"") {
@@ -29,7 +35,9 @@ func writeString(w *bufio.Writer, s string) (n int, err error) {
 }
 
 type Field interface {
-	WriteTo(w *bufio.Writer) (n int64, err error)
+	//WriteJSONTo(w Writer) (n int64, err error)
+	WriteLogfmtTo(w Writer) (n int64, err error)
+	Match(key, value string) bool
 }
 
 // String
@@ -45,7 +53,11 @@ func String(key string, value string) Field {
 	}
 }
 
-func (s StringField) WriteTo(w *bufio.Writer) (n int64, err error) {
+func (s StringField) Match(key, value string) bool {
+	return bytes.Equal(s.key, []byte(key)) && s.value == value
+}
+
+func (s StringField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
@@ -82,7 +94,11 @@ func Stringer(key string, value fmt.Stringer) Field {
 	}
 }
 
-func (s StringerField) WriteTo(w *bufio.Writer) (n int64, err error) {
+func (s StringerField) Match(key, value string) bool {
+	return bytes.Equal(s.key, []byte(key)) && s.value.String() == value
+}
+
+func (s StringerField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
@@ -117,7 +133,13 @@ func GroupedFields(key string, fields []Field) Field {
 		values: fields,
 	}
 }
-func (s GroupedField) WriteTo(w *bufio.Writer) (n int64, err error) {
+
+// TODO: implement
+func (s GroupedField) Match(key, value string) bool {
+	return false
+}
+
+func (s GroupedField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 	var k int64
 
@@ -142,7 +164,7 @@ func (s GroupedField) WriteTo(w *bufio.Writer) (n int64, err error) {
 			return
 		}
 
-		k, err = value.WriteTo(w)
+		k, err = value.WriteLogfmtTo(w)
 		n += k
 		if err != nil {
 			return
@@ -166,7 +188,12 @@ func Strings(key string, values []string) Field {
 	}
 }
 
-func (s StringsField) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement?
+func (s StringsField) Match(key, value string) bool {
+	return false
+}
+
+func (s StringsField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	for i, value := range s.values {
@@ -225,7 +252,12 @@ func Int(key string, value int) Field {
 	}
 }
 
-func (s IntField) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement
+func (s IntField) Match(key, value string) bool {
+	return false
+}
+
+func (s IntField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
@@ -262,7 +294,12 @@ func Int64(key string, value int64) Field {
 	}
 }
 
-func (s Int64Field) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement
+func (s Int64Field) Match(key, value string) bool {
+	return false
+}
+
+func (s Int64Field) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
@@ -299,7 +336,12 @@ func Float64(key string, value float64) Field {
 	}
 }
 
-func (s Float64Field) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement
+func (s Float64Field) Match(key, value string) bool {
+	return false
+}
+
+func (s Float64Field) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
@@ -336,7 +378,12 @@ func Bool(key string, value bool) Field {
 	}
 }
 
-func (s BoolField) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement
+func (s BoolField) Match(key, value string) bool {
+	return false
+}
+
+func (s BoolField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
@@ -379,7 +426,12 @@ func Error(err error) Field {
 	}
 }
 
-func (s ErrorField) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement
+func (s ErrorField) Match(key, value string) bool {
+	return false
+}
+
+func (s ErrorField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write([]byte("err"))
@@ -421,7 +473,12 @@ func Time(key string, value time.Time) Field {
 	}
 }
 
-func (s TimeField) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement
+func (s TimeField) Match(key, value string) bool {
+	return false
+}
+
+func (s TimeField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
@@ -458,7 +515,12 @@ func Duration(key string, value time.Duration) Field {
 	}
 }
 
-func (s DurationField) WriteTo(w *bufio.Writer) (n int64, err error) {
+// TODO: implement
+func (s DurationField) Match(key, value string) bool {
+	return false
+}
+
+func (s DurationField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	var m int
 
 	m, err = w.Write(s.key)
