@@ -35,7 +35,7 @@ func writeString(w Writer, s string) (n int, err error) {
 }
 
 type Field interface {
-	//WriteJSONTo(w Writer) (n int64, err error)
+	WriteJSONTo(w Writer) (n int64, err error)
 	WriteLogfmtTo(w Writer) (n int64, err error)
 	Match(key, value string) bool
 }
@@ -81,6 +81,30 @@ func (s StringField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	return
 }
 
+func (s StringField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	m, err = w.WriteString(strconv.Quote(s.value))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // Stringer
 type StringerField struct {
 	key   []byte
@@ -114,6 +138,30 @@ func (s StringerField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	}
 
 	m, err = writeString(w, s.value.String())
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s StringerField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	m, err = w.WriteString(strconv.Quote(s.value.String()))
 	n += int64(m)
 	if err != nil {
 		return
@@ -170,6 +218,54 @@ func (s GroupedField) WriteLogfmtTo(w Writer) (n int64, err error) {
 			return
 		}
 
+	}
+
+	return
+}
+
+func (s GroupedField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+	var k int64
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte('{')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	for i, value := range s.values {
+		if i != 0 {
+			err = w.WriteByte(',')
+			n += 1
+			if err != nil {
+				return
+			}
+		}
+
+		k, err = value.WriteJSONTo(w)
+		n += k
+		if err != nil {
+			return
+		}
+
+	}
+
+	err = w.WriteByte('}')
+	n += 1
+	if err != nil {
+		return
 	}
 
 	return
@@ -239,6 +335,40 @@ func (s StringsField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	return
 }
 
+func (s StringsField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	for i, value := range s.values {
+		if i != 0 {
+			err = w.WriteByte(',')
+			n += 1
+			if err != nil {
+				return
+			}
+		}
+
+		m, err = w.WriteString(fmt.Sprintf("%s_%v", string(s.key), i))
+		n += int64(m)
+		if err != nil {
+			return
+		}
+
+		err = w.WriteByte(':')
+		n += 1
+		if err != nil {
+			return
+		}
+
+		m, err = w.WriteString(strconv.Quote(value))
+		n += int64(m)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 // Int
 type IntField struct {
 	key   []byte
@@ -273,6 +403,30 @@ func (s IntField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	}
 
 	m, err = writeString(w, strconv.Itoa(s.value))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s IntField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	m, err = w.WriteString(strconv.Itoa(s.value))
 	n += int64(m)
 	if err != nil {
 		return
@@ -323,6 +477,30 @@ func (s Int64Field) WriteLogfmtTo(w Writer) (n int64, err error) {
 	return
 }
 
+func (s Int64Field) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	m, err = w.WriteString(strconv.FormatInt(s.value, 10))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // Float64
 type Float64Field struct {
 	key   []byte
@@ -365,6 +543,30 @@ func (s Float64Field) WriteLogfmtTo(w Writer) (n int64, err error) {
 	return
 }
 
+func (s Float64Field) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	m, err = w.WriteString(strconv.FormatFloat(s.value, 'f', -1, 64))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // Bool
 type BoolField struct {
 	key   []byte
@@ -393,6 +595,38 @@ func (s BoolField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	}
 
 	err = w.WriteByte('=')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	if s.value {
+		m, err = w.Write([]byte("true"))
+		n += int64(m)
+		if err != nil {
+			return
+		}
+	} else {
+		m, err = w.Write([]byte("false"))
+		n += int64(m)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+func (s BoolField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
 	n += 1
 	if err != nil {
 		return
@@ -460,6 +694,35 @@ func (s ErrorField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	return
 }
 
+func (s ErrorField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.Write([]byte("\"err\""))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	errStr := "nil"
+	if s.err != nil {
+		errStr = s.err.Error()
+	}
+
+	m, err = w.WriteString(strconv.Quote(errStr))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // Time
 type TimeField struct {
 	key   []byte
@@ -502,6 +765,30 @@ func (s TimeField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	return
 }
 
+func (s TimeField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	m, err = w.WriteString(strconv.Quote(s.value.Format(time.RFC3339Nano)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // Duration
 type DurationField struct {
 	key   []byte
@@ -536,6 +823,30 @@ func (s DurationField) WriteLogfmtTo(w Writer) (n int64, err error) {
 	}
 
 	m, err = writeString(w, s.value.String())
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s DurationField) WriteJSONTo(w Writer) (n int64, err error) {
+	var m int
+
+	m, err = w.WriteString(strconv.Quote(string(s.key)))
+	n += int64(m)
+	if err != nil {
+		return
+	}
+
+	err = w.WriteByte(':')
+	n += 1
+	if err != nil {
+		return
+	}
+
+	m, err = w.WriteString(strconv.Quote(s.value.String()))
 	n += int64(m)
 	if err != nil {
 		return

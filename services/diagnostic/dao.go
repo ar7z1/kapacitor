@@ -99,7 +99,7 @@ type tag struct {
 }
 
 type Session struct {
-	mu sync.RWMutex
+	mu sync.Mutex
 	id uuid.UUID
 
 	tags []tag
@@ -134,10 +134,11 @@ func (s *Session) Info(msg string, context, fields []Field) {
 }
 
 func (s *Session) Log(now time.Time, msg, level string, context, fields []Field) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	switch s.contentType {
 	case "application/json":
+		writeJSON(&s.buf, now, level, msg, context, fields)
 	default:
 		// TODO: This OK?
 		writeLogfmt(&s.buf, now, level, msg, context, fields)
@@ -152,7 +153,6 @@ func (s *Session) Log(now time.Time, msg, level string, context, fields []Field)
 	s.w.Flush()
 }
 
-// TODO: check level and msg
 func match(tags []tag, msg, level string, context, fields []Field) bool {
 	ctr := 0
 Loop:

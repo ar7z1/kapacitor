@@ -1,6 +1,7 @@
 package diagnostic
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -88,8 +89,10 @@ func (s *SessionService) handleSessions(w http.ResponseWriter, r *http.Request) 
 	header.Add("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
 
-	// TODO: something better
-	time.Sleep(30 * time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+	defer cancel()
+
+	<-ctx.Done()
 }
 
 type WriteFlusher interface {

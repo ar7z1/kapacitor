@@ -3,6 +3,7 @@ package diagnostic
 import (
 	"bufio"
 	"io"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -106,11 +107,11 @@ func (l *ServerLogger) Log(now time.Time, level string, msg string, ctx []Field)
 // TODO: actually care about errors?
 func writeLogfmt(w Writer, now time.Time, level string, msg string, context, fields []Field) {
 
-	writeTimestamp(w, now)
+	writeLogfmtTimestamp(w, now)
 	w.WriteByte(' ')
-	writeLevel(w, level)
+	writeLogfmtLevel(w, level)
 	w.WriteByte(' ')
-	writeMessage(w, msg)
+	writeLogfmtMessage(w, msg)
 
 	for _, f := range context {
 		w.WriteByte(' ')
@@ -125,18 +126,57 @@ func writeLogfmt(w Writer, now time.Time, level string, msg string, context, fie
 	w.WriteByte('\n')
 }
 
-func writeTimestamp(w Writer, now time.Time) {
+func writeLogfmtTimestamp(w Writer, now time.Time) {
 	w.Write([]byte("ts="))
 	// TODO: UTC?
 	w.WriteString(now.Format(RFC3339Milli))
 }
 
-func writeLevel(w Writer, lvl string) {
+func writeLogfmtLevel(w Writer, lvl string) {
 	w.Write([]byte("lvl="))
 	w.WriteString(lvl)
 }
 
-func writeMessage(w Writer, msg string) {
+func writeLogfmtMessage(w Writer, msg string) {
 	w.Write([]byte("msg="))
 	writeString(w, msg)
+}
+
+// TODO: actually care about errors?
+// TODO: Ensure non-duplicate keys
+func writeJSON(w Writer, now time.Time, level string, msg string, context, fields []Field) {
+
+	w.WriteByte('{')
+	writeJSONTimestamp(w, now)
+	w.WriteByte(',')
+	writeJSONLevel(w, level)
+	w.WriteByte(',')
+	writeJSONMessage(w, msg)
+
+	for _, f := range context {
+		w.WriteByte(',')
+		f.WriteJSONTo(w)
+	}
+
+	for _, f := range fields {
+		w.WriteByte(',')
+		f.WriteJSONTo(w)
+	}
+	w.WriteByte('}')
+}
+
+func writeJSONTimestamp(w Writer, now time.Time) {
+	w.Write([]byte("\"ts\":"))
+	// TODO: UTC?
+	w.WriteString(strconv.Quote(now.Format(RFC3339Milli)))
+}
+
+func writeJSONLevel(w Writer, lvl string) {
+	w.Write([]byte("\"lvl\":"))
+	w.WriteString(strconv.Quote(lvl))
+}
+
+func writeJSONMessage(w Writer, msg string) {
+	w.Write([]byte("\"msg\":"))
+	w.WriteString(strconv.Quote(msg))
 }
