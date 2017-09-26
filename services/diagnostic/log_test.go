@@ -429,3 +429,341 @@ func TestLogger_SetLeveF(t *testing.T) {
 		return
 	}
 }
+
+func TestSessionsLoggerWithoutContext(t *testing.T) {
+	now := time.Now()
+	nowStr := now.Format(diagnostic.RFC3339Milli)
+	buf := bytes.NewBuffer(nil)
+	service := diagnostic.NewSessionService()
+	// TODO: we need ths?
+	_ = service.NewLogger()
+	session := service.SessionsStore.Create(&writeFlusher{buf: buf}, "application/json", nil)
+	defer service.SessionsStore.Delete(session)
+
+	tests := []struct {
+		name   string
+		exp    map[string]interface{}
+		lvl    string
+		msg    string
+		fields []diagnostic.Field
+	}{
+		{
+			name: "no fields simple message",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "this",
+			},
+			lvl: "error",
+			msg: "this",
+		},
+		{
+			name: "no fields less simple message",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "this/is/a/test",
+			},
+			lvl: "error",
+			msg: "this/is/a/test",
+		},
+		{
+			name: "no fields complex message",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "this is \" a test/yeah",
+			},
+			lvl: "error",
+			msg: "this is \" a test/yeah",
+		},
+		{
+			name: "simple string field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": "this",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.String("test", "this"),
+			},
+		},
+		{
+			name: "complex string field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": "this is \\\" a test/yeah",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.String("test", "this is \" a test/yeah"),
+			},
+		},
+		{
+			name: "simple stringer field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": "this",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Stringer("test", testStringer("this")),
+			},
+		},
+		{
+			name: "simple single grouped field",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "test",
+				"test": map[string]interface{}{
+					"a": "this",
+				},
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.GroupedFields("test", []diagnostic.Field{
+					diagnostic.String("a", "this"),
+				}),
+			},
+		},
+		{
+			name: "simple double grouped field",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "test",
+				"test": map[string]interface{}{
+					"a": "this",
+					"b": "other",
+				},
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.GroupedFields("test", []diagnostic.Field{
+					diagnostic.String("a", "this"),
+					diagnostic.String("b", "other"),
+				}),
+			},
+		},
+		{
+			name: "simple single strings field",
+			exp: map[string]interface{}{
+				"ts":     fmt.Sprintf("%v", nowStr),
+				"lvl":    "error",
+				"msg":    "test",
+				"test_0": "this",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Strings("test", []string{"this"}),
+			},
+		},
+		{
+			name: "simple double strings field",
+			exp: map[string]interface{}{
+				"ts":     fmt.Sprintf("%v", nowStr),
+				"lvl":    "error",
+				"msg":    "test",
+				"test_0": "this",
+				"test_1": "other",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Strings("test", []string{"this", "other"}),
+			},
+		},
+		{
+			name: "int field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": 10,
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Int("test", 10),
+			},
+		},
+		{
+			name: "int64 field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": 10,
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Int64("test", 10),
+			},
+		},
+		{
+			name: "float64 field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": 3.1415926535,
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Float64("test", 3.1415926535),
+			},
+		},
+		{
+			name: "bool true field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": true,
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Bool("test", true),
+			},
+		},
+		{
+			name: "bool false field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": false,
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Bool("test", false),
+			},
+		},
+		{
+			name: "simple error field",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "test",
+				"err": "this",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Error(errors.New("this")),
+			},
+		},
+		{
+			name: "nil error field",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "test",
+				"err": "nil",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Error(nil),
+			},
+		},
+		{
+			name: "complex error field",
+			exp: map[string]interface{}{
+				"ts":  fmt.Sprintf("%v", nowStr),
+				"lvl": "error",
+				"msg": "test",
+				"err": "this is \\\" a test/yeah",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Error(errors.New("this is \" a test/yeah")),
+			},
+		},
+		{
+			name: "time field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"time": defaultTime.Format(time.RFC3339Nano),
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Time("time", defaultTime),
+			},
+		},
+		{
+			name: "duration field",
+			exp: map[string]interface{}{
+				"ts":   fmt.Sprintf("%v", nowStr),
+				"lvl":  "error",
+				"msg":  "test",
+				"test": "1s",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.Duration("test", time.Second),
+			},
+		},
+		{
+			name: "two fields",
+			exp: map[string]interface{}{
+				"ts":      fmt.Sprintf("%v", nowStr),
+				"lvl":     "error",
+				"msg":     "test",
+				"testing": "that this",
+				"works":   "1s",
+			},
+			lvl: "error",
+			msg: "test",
+			fields: []diagnostic.Field{
+				diagnostic.String("testing", "that this"),
+				diagnostic.Duration("works", time.Second),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer buf.Reset()
+			session.Log(now, test.lvl, test.msg, nil, test.fields)
+			// TODO: implement check
+			//if exp, got := test.exp, buf.String(); exp != got {
+			//	t.Fatalf("bad log line:\nexp: `%v`\ngot: `%v`", strconv.Quote(exp), strconv.Quote(got))
+			//}
+		})
+	}
+}
+
+type writeFlusher struct {
+	buf *bytes.Buffer
+}
+
+func (w *writeFlusher) Write(b []byte) (int, error) {
+	return w.buf.Write(b)
+}
+
+func (w *writeFlusher) Flush() error {
+	return nil
+}

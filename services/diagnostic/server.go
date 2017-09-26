@@ -22,15 +22,15 @@ type SessionService struct {
 	//diag   Diagnostic
 	routes []httpd.Route
 
-	sessions     SessionsStore
-	HTTPDService interface {
+	SessionsStore SessionsStore
+	HTTPDService  interface {
 		AddRoutes([]httpd.Route) error
 	}
 }
 
 func NewSessionService() *SessionService {
 	return &SessionService{
-		sessions: &sessionsStore{
+		SessionsStore: &sessionsStore{
 			sessions: make(map[uuid.UUID]*Session),
 		},
 	}
@@ -62,7 +62,7 @@ func (s *SessionService) Open() error {
 
 func (s *SessionService) NewLogger() *sessionsLogger {
 	return &sessionsLogger{
-		store: s.sessions,
+		store: s.SessionsStore,
 	}
 }
 
@@ -82,8 +82,8 @@ func (s *SessionService) handleSessions(w http.ResponseWriter, r *http.Request) 
 	contentType := r.Header.Get("Content-Type")
 
 	// TODO: do better verification of content type here
-	session := s.sessions.Create(&httpWriteFlusher{w: w}, contentType, tags)
-	defer s.sessions.Delete(session)
+	session := s.SessionsStore.Create(&httpWriteFlusher{w: w}, contentType, tags)
+	defer s.SessionsStore.Delete(session)
 
 	header := w.Header()
 	header.Add("Transfer-Encoding", "chunked")
