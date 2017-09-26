@@ -1,11 +1,9 @@
 package diagnostic
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -27,9 +25,6 @@ type SessionService struct {
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 	}
-
-	ticker  *time.Ticker
-	closing chan struct{}
 }
 
 func NewSessionService() *SessionService {
@@ -40,31 +35,19 @@ func NewSessionService() *SessionService {
 	}
 }
 
-// TODO: implement
 func (s *SessionService) Close() error {
-	s.closing <- struct{}{}
-	s.ticker.Stop()
-	close(s.closing)
 	return nil
 }
 
 func (s *SessionService) Open() error {
-	ch := make(chan struct{}, 0)
-	s.ticker = time.NewTicker(time.Second)
 
 	s.routes = []httpd.Route{
 		{
-			Method:      "POST",
-			Pattern:     sessionsPath,
-			HandlerFunc: s.handleCreateSession,
-		},
-		{
 			Method:      "GET",
 			Pattern:     sessionsPath,
-			HandlerFunc: s.handleSession,
+			HandlerFunc: s.handleSessions,
 		},
 	}
-	s.closing = ch
 
 	if s.HTTPDService == nil {
 		return errors.New("must set HTTPDService")
@@ -73,19 +56,6 @@ func (s *SessionService) Open() error {
 	if err := s.HTTPDService.AddRoutes(s.routes); err != nil {
 		return fmt.Errorf("failed to add routes: %v", err)
 	}
-
-	go func() {
-		for {
-			select {
-			case <-s.ticker.C:
-				if err := s.sessions.Prune(); err != nil {
-					// TODO: log error
-				}
-			case <-ch:
-				return
-			}
-		}
-	}()
 	return nil
 }
 
@@ -95,7 +65,7 @@ func (s *SessionService) NewLogger() *sessionsLogger {
 	}
 }
 
-func (s *SessionService) handleCreateSession(w http.ResponseWriter, r *http.Request) {
+func (s *SessionService) handleSessions(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	tags := []tag{}
 
@@ -108,65 +78,39 @@ func (s *SessionService) handleCreateSession(w http.ResponseWriter, r *http.Requ
 		tags = append(tags, tag{key: k, value: v[0]})
 	}
 
-	session := s.sessions.Create(tags)
-	u := fmt.Sprintf("%s%s?id=%s&page=%v", httpd.BasePath, sessionsPath, session.ID(), session.Page())
+	contentType := r.Header.Get("Content-Type")
+
+	// TODO: do better verification of content type here
+	session := s.sessions.Create(&httpWriteFlusher{w: w}, contentType, tags)
+	defer s.sessions.Delete(session)
 
 	header := w.Header()
-	header.Add("Link", fmt.Sprintf("<%s>; rel=\"next\";", u))
-	header.Add("Deadline", session.Deadline().UTC().String())
+	header.Add("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
+
+	// TODO: something better
+	time.Sleep(30 * time.Second)
 }
 
-func (s *SessionService) handleSession(w http.ResponseWriter, r *http.Request) {
-	params := r.URL.Query()
+type WriteFlusher interface {
+	Write([]byte) (int, error)
+	Flush() error
+}
 
-	id := params.Get("id")
-	if id == "" {
-		httpd.HttpError(w, "missing id query param", true, http.StatusBadRequest)
-		return
-	}
-	pageStr := params.Get("page")
-	if pageStr == "" {
-		httpd.HttpError(w, "missing page param", true, http.StatusBadRequest)
-		return
-	}
-	page, err := strconv.Atoi(pageStr)
-	if err != nil {
-		// TODO(desa): add some context to this error
-		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-		return
+type httpWriteFlusher struct {
+	w http.ResponseWriter
+}
+
+func (h *httpWriteFlusher) Write(buf []byte) (int, error) {
+	return h.w.Write(buf)
+}
+func (h *httpWriteFlusher) Flush() error {
+	flusher, ok := h.w.(http.Flusher)
+	if !ok {
+		return errors.New("failed to coerce to http.Flusher")
 	}
 
-	session, err := s.sessions.Get(id)
-	if err != nil {
-		// TODO(desa): add some context to this error
-		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-		return
-	}
+	flusher.Flush()
 
-	p, err := session.GetPage(page)
-	if err != nil {
-		// TODO(desa): add some context to this error
-		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-		return
-	}
-
-	// TODO: add byte buffer pool here
-	buf := bytes.NewBuffer(nil)
-	// TODO: add support for JSON and logfmt encoding
-	for _, l := range p {
-		writeLogfmt(buf, l.Time, l.Level, l.Message, l.Context, l.Fields)
-		//line.WriteTo(buf)
-	}
-
-	u := fmt.Sprintf("%s%s?id=%s&page=%v", httpd.BasePath, sessionsPath, session.ID(), session.Page())
-
-	header := w.Header()
-	header.Add("Link", fmt.Sprintf("<%s>; rel=\"next\";", u))
-	header.Add("Deadline", session.Deadline().UTC().String())
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(buf.Bytes())
-	//w.Write([]byte("yah"))
-
-	return
+	return nil
 }

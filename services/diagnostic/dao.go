@@ -1,6 +1,7 @@
 package diagnostic
 
 import (
+	"bytes"
 	"errors"
 	"sync"
 	"time"
@@ -8,17 +9,9 @@ import (
 	"github.com/influxdata/kapacitor/uuid"
 )
 
-const (
-	pageSize = 10
-	// TODO: what to make this value
-	sessionExipryDuration = 10 * time.Second
-)
-
 type SessionsStore interface {
-	Create(tags []tag) *Session
-	Get(id string) (*Session, error)
-	Delete(id string) error
-	Prune() error
+	Create(w WriteFlusher, contentType string, tags []tag) *Session
+	Delete(s *Session) error
 	Each(func(*Session))
 }
 
@@ -27,32 +20,27 @@ type sessionsStore struct {
 	sessions map[uuid.UUID]*Session
 }
 
-func (kv *sessionsStore) Create(tags []tag) *Session {
+func (kv *sessionsStore) Create(w WriteFlusher, contentType string, tags []tag) *Session {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	s := &Session{
-		id:       uuid.New(),
-		deadline: time.Now().Add(sessionExipryDuration),
-		tags:     tags,
-		queue:    &Queue{},
+		id:          uuid.New(),
+		tags:        tags,
+		w:           w,
+		contentType: contentType,
 	}
 
 	kv.sessions[s.id] = s
 
-	// TODO: register with Diagnostic service
 	return s
 }
 
-func (kv *sessionsStore) Delete(id string) error {
+func (kv *sessionsStore) Delete(s *Session) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
-	s, err := kv.get(id)
-	if err != nil {
-		return err
-	}
 
-	if err := s.Close(); err != nil {
-		return err
+	if s == nil {
+		return errors.New("session is nil")
 	}
 
 	delete(kv.sessions, s.id)
@@ -66,58 +54,6 @@ func (kv *sessionsStore) Each(fn func(*Session)) {
 	for _, s := range kv.sessions {
 		fn(s)
 	}
-}
-
-func (kv *sessionsStore) Prune() error {
-	ids := []uuid.UUID{}
-	kv.mu.RLock()
-	now := time.Now()
-	for _, s := range kv.sessions {
-		if now.After(s.deadline) {
-			ids = append(ids, s.id)
-		}
-	}
-	kv.mu.RUnlock()
-
-	errs := []error{}
-	for _, id := range ids {
-		// TODO: maybe change function signature of delete
-		if err := kv.Delete(id.String()); err != nil {
-			// TODO log error
-			errs = append(errs, err)
-		}
-	}
-
-	return nil
-}
-
-func (kv *sessionsStore) Get(id string) (*Session, error) {
-	kv.mu.RLock()
-	defer kv.mu.RUnlock()
-	s, err := kv.get(id)
-	if err != nil {
-		return nil, err
-	}
-
-	if time.Now().After(s.deadline) {
-		return nil, errors.New("session expired")
-	}
-
-	return s, nil
-}
-
-func (kv *sessionsStore) get(id string) (*Session, error) {
-	sid, err := uuid.Parse(id)
-	if err != nil {
-		return nil, err
-	}
-
-	s, ok := kv.sessions[sid]
-	if !ok {
-		return nil, errors.New("session not found")
-	}
-
-	return s, nil
 }
 
 type sessionsLogger struct {
@@ -163,106 +99,57 @@ type tag struct {
 }
 
 type Session struct {
-	mu       sync.RWMutex
-	id       uuid.UUID
-	page     int
-	deadline time.Time
+	mu sync.RWMutex
+	id uuid.UUID
 
 	tags []tag
 
-	queue *Queue
-}
-
-func (s *Session) ID() string {
-	return s.id.String()
-}
-
-func (s *Session) Deadline() time.Time {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.deadline
-}
-
-func (s *Session) Page() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.page
-}
-
-func (s *Session) GetPage(page int) ([]*Data, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if page != s.page {
-		return nil, errors.New("bad page value")
-	}
-	s.page++
-	s.deadline = s.deadline.Add(sessionExipryDuration)
-
-	//l := make([]*Data, 0, pageSize)
-	l := []*Data{}
-	for i := 0; i < pageSize; i++ {
-		if s.queue.Len() == 0 {
-			break
-		}
-		if d := s.queue.Dequeue(); d != nil {
-			l = append(l, d)
-		}
-	}
-
-	return l, nil
-}
-
-// TODO: implement closing logic here
-func (s *Session) Close() error {
-	return nil
+	buf         bytes.Buffer
+	w           WriteFlusher
+	contentType string
 }
 
 func (s *Session) Error(msg string, context, fields []Field) {
 	if match(s.tags, msg, "error", context, fields) {
-		s.queue.Enqueue(&Data{
-			Time:    time.Now(),
-			Message: msg,
-			Level:   "info",
-			Context: context,
-			Fields:  fields,
-		})
+		s.Log(time.Now(), "error", msg, context, fields)
 	}
 }
 
 func (s *Session) Warn(msg string, context, fields []Field) {
 	if match(s.tags, msg, "warn", context, fields) {
-		s.queue.Enqueue(&Data{
-			Time:    time.Now(),
-			Message: msg,
-			Level:   "info",
-			Context: context,
-			Fields:  fields,
-		})
+		s.Log(time.Now(), "error", msg, context, fields)
 	}
 }
 
 func (s *Session) Debug(msg string, context, fields []Field) {
 	if match(s.tags, msg, "debug", context, fields) {
-		s.queue.Enqueue(&Data{
-			Time:    time.Now(),
-			Message: msg,
-			Level:   "info",
-			Context: context,
-			Fields:  fields,
-		})
+		s.Log(time.Now(), "error", msg, context, fields)
 	}
 }
 
 func (s *Session) Info(msg string, context, fields []Field) {
 	if match(s.tags, msg, "info", context, fields) {
-		s.queue.Enqueue(&Data{
-			Time:    time.Now(),
-			Message: msg,
-			Level:   "info",
-			Context: context,
-			Fields:  fields,
-		})
+		s.Log(time.Now(), "error", msg, context, fields)
 	}
+}
+
+func (s *Session) Log(now time.Time, msg, level string, context, fields []Field) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	switch s.contentType {
+	case "application/json":
+	default:
+		// TODO: This OK?
+		writeLogfmt(&s.buf, now, level, msg, context, fields)
+	}
+	// write data
+	s.w.Write(s.buf.Bytes())
+	// reset buffer
+	s.buf.Reset()
+	// write delimiter
+	s.w.Write([]byte("\n\n"))
+	// flush chunk
+	s.w.Flush()
 }
 
 // TODO: check level and msg
