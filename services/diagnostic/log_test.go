@@ -2,8 +2,10 @@ package diagnostic_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -497,7 +499,7 @@ func TestSessionsLoggerWithoutContext(t *testing.T) {
 				"ts":   fmt.Sprintf("%v", nowStr),
 				"lvl":  "error",
 				"msg":  "test",
-				"test": "this is \\\" a test/yeah",
+				"test": "this is \" a test/yeah",
 			},
 			lvl: "error",
 			msg: "test",
@@ -690,7 +692,7 @@ func TestSessionsLoggerWithoutContext(t *testing.T) {
 				"ts":  fmt.Sprintf("%v", nowStr),
 				"lvl": "error",
 				"msg": "test",
-				"err": "this is \\\" a test/yeah",
+				"err": "this is \" a test/yeah",
 			},
 			lvl: "error",
 			msg: "test",
@@ -748,12 +750,45 @@ func TestSessionsLoggerWithoutContext(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer buf.Reset()
 			session.Log(now, test.lvl, test.msg, nil, test.fields)
-			// TODO: implement check
-			//if exp, got := test.exp, buf.String(); exp != got {
-			//	t.Fatalf("bad log line:\nexp: `%v`\ngot: `%v`", strconv.Quote(exp), strconv.Quote(got))
-			//}
+			exp, err := jsonStr(test.exp)
+			if err != nil {
+				t.Fatal(err)
+				return
+			}
+			got := buf.String()
+			eq, err := jsonEqual(exp, got)
+			if err != nil {
+				t.Fatalf("encountered error: %v\nexp: %v\ngot: %v\n", err, exp, got)
+				return
+			}
+
+			if !eq {
+				t.Fatalf("bad JSON line:\nexp: `%v`\ngot: `%v`", exp, got)
+			}
 		})
 	}
+}
+
+func jsonEqual(s1, s2 string) (bool, error) {
+	var o1 interface{}
+	var o2 interface{}
+
+	if err := json.Unmarshal([]byte(s1), &o1); err != nil {
+		return false, fmt.Errorf("failed to unmarshal first argument: %v", err)
+	}
+
+	if err := json.Unmarshal([]byte(s2), &o2); err != nil {
+		return false, fmt.Errorf("failed to unmarshal second argument: %v", err)
+	}
+
+	return reflect.DeepEqual(o1, o2), nil
+}
+
+func jsonStr(o interface{}) (string, error) {
+
+	b, err := json.Marshal(o)
+
+	return string(b), err
 }
 
 type writeFlusher struct {

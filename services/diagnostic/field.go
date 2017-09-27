@@ -347,7 +347,7 @@ func (s StringsField) WriteJSONTo(w Writer) (n int64, err error) {
 			}
 		}
 
-		m, err = w.WriteString(fmt.Sprintf("%s_%v", string(s.key), i))
+		m, err = w.WriteString(fmt.Sprintf("\"%s_%v\"", string(s.key), i))
 		n += int64(m)
 		if err != nil {
 			return

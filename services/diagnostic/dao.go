@@ -133,7 +133,7 @@ func (s *Session) Info(msg string, context, fields []Field) {
 	}
 }
 
-func (s *Session) Log(now time.Time, msg, level string, context, fields []Field) {
+func (s *Session) Log(now time.Time, level, msg string, context, fields []Field) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch s.contentType {
