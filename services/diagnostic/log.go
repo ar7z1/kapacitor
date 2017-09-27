@@ -143,7 +143,7 @@ func writeLogfmtMessage(w Writer, msg string) {
 }
 
 // TODO: actually care about errors?
-// TODO: Ensure non-duplicate keys
+// TODO: ensure non-duplicate keys?
 func writeJSON(w Writer, now time.Time, level string, msg string, context, fields []Field) {
 
 	w.WriteByte('{')
